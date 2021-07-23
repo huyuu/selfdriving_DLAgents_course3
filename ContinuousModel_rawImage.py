@@ -21,7 +21,8 @@ def train_test_split(images, subParas, labels, trainRatio=0.99):
 class DeepModel():
     def __init__(self):
         # self.traceDataDirPath = '../data/trace1'
-        self.traceDataDirPath = '../trace2_data'
+        # self.traceDataDirPath = '../trace2_data'
+        self.traceDataDirPath = "C:\\Users\\uie27589\\OneDrive - Continental AG\\2021\\MiniProjectAI\\trace3"
         # load model
         self.modelPath = './continuousModel_rawImage.h5'
         self.model = self.__loadModel()
@@ -84,12 +85,12 @@ class DeepModel():
             image_layer = kr.layers.Dense(1, activation='tanh', name='image_dense3')(image_layer)
 
             # subPara_inputs = layers.Input(shape=env.observation_spec['subPara']['shape'], dtype=np.float, name='subPara')
-            subPara_inputs = kr.layers.Input(shape=(1,), dtype=np.float, name='subPara')
+            subPara_inputs = kr.layers.Input(shape=(3,), dtype=np.float, name='subPara')
             # subPara_dense = kr.layers.Dense(8, activation='tanh', name='subPara_dense')(subPara_inputs)
 
             common = kr.layers.concatenate([image_layer, subPara_inputs])
 
-            num_actions = 1
+            num_actions = 2
             # common = kr.layers.Dense(8, activation="tanh", name='common_dense1')(common)
             # num_actions = env.action_spec['shape'][0]
             # action = kr.layers.Dense(num_actions, name='action_dense1')(common)
@@ -116,11 +117,8 @@ class DeepModel():
             images = []
             subParas = []
             labels = []
-            steering_angle_last = 0.0
-            throttle_last = 0.0
-            speed_last = 0.0
             logPath = f"{self.traceDataDirPath}/{dataSetDirName}/driving_log.csv"
-            print(f"start training {logPath} ...")
+            # print(f"start training {logPath} ...")
             logData = pd.read_csv(logPath, names=[
                 'Center Image',
                 'Left Image',
@@ -133,6 +131,7 @@ class DeepModel():
             # create label
             for index in logData.index[:-2]:
                 logData.loc[index, 'Next Steering Angle'] = (logData.loc[index+1, 'Steering Angle'] + logData.loc[index+2, 'Steering Angle'])/2
+                logData.loc[index, 'Next Throttle'] = (logData.loc[index+1, 'Throttle'] - logData.loc[index+1, 'Break'] + logData.loc[index+2, 'Throttle'] - logData.loc[index+2, 'Break'])/2
                 # print(logData.groupby('Next Steering Angle').count())
             logData = logData.dropna()
             logData.to_csv(f"{self.traceDataDirPath}/{dataSetDirName}/new_log.csv")
@@ -143,6 +142,7 @@ class DeepModel():
         count = 0
         while True:
             dataSetDirNames = np.random.permutation(dataSetDirNames).tolist()
+            data = None
             for dataSetDirName in dataSetDirNames:
                 logPath = f"{self.traceDataDirPath}/{dataSetDirName}/new_log.csv"
                 logData = pd.read_csv(logPath, names=[
@@ -153,55 +153,80 @@ class DeepModel():
                     'Throttle',
                     'Break',
                     'Speed',
-                    'Next Steering Angle'
+                    'Next Steering Angle',
+                    'Next Throttle'
                 ])
-                for index in np.random.permutation(logData.index):
-                    imageName = logData.loc[index, 'Center Image'].split('\\')[-1]
-                    imagePath = f"{self.traceDataDirPath}/{dataSetDirName}/IMG/{imageName}"
-                    image = cv2.imread(imagePath, cv2.IMREAD_COLOR)
-                    if image is None:
-                        continue
-                    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-                    subPara = float(logData.loc[index, 'Steering Angle'])
-                    label = float(logData.loc[index, 'Next Steering Angle'])
-                    actionType = np.random.choice(6)
-                    if actionType == 0: # normal
-                        images.append(image.astype("float32") / 255)
-                        subParas.append(subPara)
-                        labels.append(label)
-                    elif actionType == 1: # flipped
-                        image_flipped = cv2.flip(deepcopy(image), 1)
-                        images.append(image_flipped.astype("float32") / 255)
-                        subParas.append(-subPara)
-                        labels.append(-label)
-                    elif actionType == 2: # dark
-                        image_dark = cv2.cvtColor(deepcopy(image), cv2.COLOR_RGB2HSV)
-                        newBrightnessDelta = np.random.normal(30, 15)
-                        image_dark[:, :, 2] = np.clip(image_dark[:, :, 2] - newBrightnessDelta, 0, 255)
-                        image_dark = cv2.cvtColor(image_dark, cv2.COLOR_HSV2RGB)
-                        images.append(image_dark.astype("float32") / 255)
-                        subParas.append(subPara)
-                        labels.append(label)
-                    elif actionType == 3: # dark flipped
-                        image_dark_flipped = cv2.flip(deepcopy(image), 1)
-                        image_dark = cv2.cvtColor(image_dark_flipped, cv2.COLOR_RGB2HSV)
-                        newBrightnessDelta = np.random.normal(30, 15)
-                        image_dark_flipped[:, :, 2] = np.clip(image_dark_flipped[:, :, 2] - newBrightnessDelta, 0, 255)
-                        image_dark_flipped = cv2.cvtColor(image_dark_flipped, cv2.COLOR_HSV2RGB)
-                        images.append(image_dark_flipped.astype("float32") / 255)
-                        subParas.append(-subPara)
-                        labels.append(-label)
-                    count += 1
-                    if count >= batch_size:
-                        images_copy = deepcopy(np.array(images, dtype="float32"))
-                        subParas_copy = deepcopy(np.array(subParas, dtype="float32").reshape(-1, 1))
-                        labels_copy = deepcopy(np.array(labels, dtype="float32").reshape(-1, 1))
-                        assert images_copy.shape[0] == subParas_copy.shape[0] == labels_copy.shape[0]
-                        images = []
-                        subParas = []
-                        labels = []
-                        count = 0
-                        yield ([images_copy, subParas_copy], labels_copy)
+                if data is None:
+                    data = logData
+                else:
+                    data = pd.concat([data, logData], ignore_index=True)
+            print(data)
+            for index in np.random.permutation(data.index):
+                imageName = data.loc[index, 'Center Image'].split('\\')[-1]
+                imagePath = f"{self.traceDataDirPath}/{dataSetDirName}/IMG/{imageName}"
+                image = cv2.imread(imagePath, cv2.IMREAD_COLOR)
+                if image is None:
+                    continue
+                # get observations
+                image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                # subPara = float(data.loc[index, 'Steering Angle'])
+                subPara = [
+                    float(data.loc[index, 'Steering Angle']),
+                    float(data.loc[index, 'Throttle']) - float(data.loc[index, 'Break']),
+                    float(data.loc[index, 'Speed'])
+                ]
+                subPara_flipped = [
+                    -1.0 * float(data.loc[index, 'Steering Angle']),
+                    float(data.loc[index, 'Throttle']) - float(data.loc[index, 'Break']),
+                    float(data.loc[index, 'Speed'])
+                ]
+                label = [
+                    float(data.loc[index, 'Next Steering Angle']),
+                    float(data.loc[index, 'Next Throttle'])
+                ]
+                label_flipped = [
+                    -1.0 * float(data.loc[index, 'Next Steering Angle']),
+                    float(data.loc[index, 'Next Throttle'])
+                ]
+                # choose image type
+                actionType = np.random.choice(4)
+                if actionType == 0: # normal
+                    images.append(image.astype("float32") / 255)
+                    subParas.append(subPara)
+                    labels.append(label)
+                elif actionType == 1: # flipped
+                    image_flipped = cv2.flip(deepcopy(image), 1)
+                    images.append(image_flipped.astype("float32") / 255)
+                    subParas.append(subPara_flipped)
+                    labels.append(label_flipped)
+                elif actionType == 2: # dark
+                    image_dark = cv2.cvtColor(deepcopy(image), cv2.COLOR_RGB2HSV)
+                    newBrightnessDelta = np.random.normal(30, 15)
+                    image_dark[:, :, 2] = np.clip(image_dark[:, :, 2] - newBrightnessDelta, 0, 255)
+                    image_dark = cv2.cvtColor(image_dark, cv2.COLOR_HSV2RGB)
+                    images.append(image_dark.astype("float32") / 255)
+                    subParas.append(subPara)
+                    labels.append(label)
+                elif actionType == 3: # dark flipped
+                    image_dark_flipped = cv2.flip(deepcopy(image), 1)
+                    image_dark = cv2.cvtColor(image_dark_flipped, cv2.COLOR_RGB2HSV)
+                    newBrightnessDelta = np.random.normal(30, 15)
+                    image_dark_flipped[:, :, 2] = np.clip(image_dark_flipped[:, :, 2] - newBrightnessDelta, 0, 255)
+                    image_dark_flipped = cv2.cvtColor(image_dark_flipped, cv2.COLOR_HSV2RGB)
+                    images.append(image_dark_flipped.astype("float32") / 255)
+                    subParas.append(subPara_flipped)
+                    labels.append(label_flipped)
+                count += 1
+                if count >= batch_size:
+                    images_copy = deepcopy(np.array(images, dtype="float32"))
+                    subParas_copy = deepcopy(np.array(subParas, dtype="float32").reshape(-1, 3))
+                    labels_copy = deepcopy(np.array(labels, dtype="float32").reshape(-1, 2))
+                    assert images_copy.shape[0] == subParas_copy.shape[0] == labels_copy.shape[0]
+                    images = []
+                    subParas = []
+                    labels = []
+                    count = 0
+                    yield ([images_copy, subParas_copy], labels_copy)
 
 
 
