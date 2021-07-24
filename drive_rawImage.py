@@ -45,8 +45,8 @@ def telemetry(sid, data):
     steering_angle = float(data["steering_angle"]) / 25.0
     throttle = float(data["throttle"])
     speed = float(data["speed"]) / 30.5
-    # subPara = np.array([steering_angle, throttle, speed], dtype="float32").reshape(1, -1)
-    subPara = np.array([steering_angle], dtype="float32").reshape(1, -1)
+    subPara = np.array([steering_angle, throttle, speed], dtype="float32").reshape(1, -1)
+    # subPara = np.array([steering_angle], dtype="float32").reshape(1, -1)
 
     # The current image from the center camera of the car
     image_path = data["image"]
@@ -62,18 +62,21 @@ def telemetry(sid, data):
     # action = np.argmax(action_prob)
 
     # steering_angle_before = model.predict(image, batch_size=None)[0, 0]
-    steering_angle_before = model.predict([image, subPara], batch_size=None)[0, 0]
+    steering_angle_before, throttle_before = model.predict([image, subPara], batch_size=None)[0, :]
+    # throttle_before = 0.2
     # steering_angle_before = max(-0.5, min(0.5, steering_angle_before))
     # throttle_before = 1.0# if speed <= 0.9 else 0.0
     # throttle_before = 0.5 if abs(steering_angle_before) <= 0.25 else -1.0
-    throttle_before = 1.0
-    global sameCount
-    if np.sign(steering_angle_before) == np.sign(steering_angle):
-        sameCount += 1
-    else:
-        sameCount = 0
-    if sameCount >= 3:
-        throttle_before = -1.0 if speed >= 0.4 else 0.5
+
+    # throttle_before = 1.0
+    # global sameCount
+    # if np.sign(steering_angle_before) == np.sign(steering_angle):
+    #     sameCount += 1
+    # else:
+    #     sameCount = 0
+    # if sameCount >= 3:
+    #     throttle_before = -1.0 if speed >= 0.4 else 0.5
+
     # if abs(steering_angle_before) <= 0.1:
     #     throttle_before = 0.8
     # else:

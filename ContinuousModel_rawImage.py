@@ -26,6 +26,7 @@ class DeepModel():
         # load model
         self.modelPath = './continuousModel_rawImage.h5'
         self.model = self.__loadModel()
+        self.shouldCollectStraight = True
 
 
     # MARK: - Public Method
@@ -91,7 +92,7 @@ class DeepModel():
             common = kr.layers.concatenate([image_layer, subPara_inputs])
 
             num_actions = 2
-            # common = kr.layers.Dense(8, activation="tanh", name='common_dense1')(common)
+            # common = kr.layers.Dense(32, name='common_dense1')(common)
             # num_actions = env.action_spec['shape'][0]
             # action = kr.layers.Dense(num_actions, name='action_dense1')(common)
             common = kr.layers.Dense(num_actions, activation='tanh', name='common_output')(common)
@@ -142,6 +143,7 @@ class DeepModel():
         count = 0
         while True:
             dataSetDirNames = np.random.permutation(dataSetDirNames).tolist()
+            # get concatenated data
             data = None
             for dataSetDirName in dataSetDirNames:
                 logPath = f"{self.traceDataDirPath}/{dataSetDirName}/new_log.csv"
@@ -160,13 +162,27 @@ class DeepModel():
                     data = logData
                 else:
                     data = pd.concat([data, logData], ignore_index=True)
-            print(data)
+            # print("here")
+            # pd.set_option('display.max_rows', 300)
+            # print(data.groupby('Next Steering Angle').count()['Center Image'])
+            # exit()
+            # start looping for random row
             for index in np.random.permutation(data.index):
                 imageName = data.loc[index, 'Center Image'].split('\\')[-1]
                 imagePath = f"{self.traceDataDirPath}/{dataSetDirName}/IMG/{imageName}"
                 image = cv2.imread(imagePath, cv2.IMREAD_COLOR)
                 if image is None:
                     continue
+                if self.shouldCollectStraight == True:
+                    if abs(float(data.loc[index, 'Next Steering Angle'])) > 1e-2:
+                        continue
+                    else:
+                        self.shouldCollectStraight = False
+                else:
+                    if abs(float(data.loc[index, 'Next Steering Angle'])) <= 1e-2:
+                        continue
+                    else:
+                        self.shouldCollectStraight = True
                 # get observations
                 image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
                 # subPara = float(data.loc[index, 'Steering Angle'])
