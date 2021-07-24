@@ -86,7 +86,7 @@ class DeepModel():
             image_layer = kr.layers.Dense(1, activation='tanh', name='image_dense3')(image_layer)
 
             # subPara_inputs = layers.Input(shape=env.observation_spec['subPara']['shape'], dtype=np.float, name='subPara')
-            subPara_inputs = kr.layers.Input(shape=(3,), dtype=np.float, name='subPara')
+            subPara_inputs = kr.layers.Input(shape=(1,), dtype=np.float, name='subPara')
             # subPara_dense = kr.layers.Dense(8, activation='tanh', name='subPara_dense')(subPara_inputs)
 
             common = kr.layers.concatenate([image_layer, subPara_inputs])
@@ -173,37 +173,40 @@ class DeepModel():
                 image = cv2.imread(imagePath, cv2.IMREAD_COLOR)
                 if image is None:
                     continue
-                if self.shouldCollectStraight == True:
-                    if abs(float(data.loc[index, 'Next Steering Angle'])) > 1e-2:
-                        continue
-                    else:
-                        self.shouldCollectStraight = False
-                else:
-                    if abs(float(data.loc[index, 'Next Steering Angle'])) <= 1e-2:
-                        continue
-                    else:
-                        self.shouldCollectStraight = True
+                # if self.shouldCollectStraight == True:
+                #     if abs(float(data.loc[index, 'Next Steering Angle'])) > 1e-2:
+                #         continue
+                #     else:
+                #         self.shouldCollectStraight = False
+                # else:
+                #     if abs(float(data.loc[index, 'Next Steering Angle'])) <= 1e-2:
+                #         continue
+                #     else:
+                #         self.shouldCollectStraight = True
                 # get observations
                 image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-                # subPara = float(data.loc[index, 'Steering Angle'])
-                subPara = [
-                    float(data.loc[index, 'Steering Angle']),
-                    float(data.loc[index, 'Throttle']) - float(data.loc[index, 'Break']),
-                    float(data.loc[index, 'Speed'])
-                ]
-                subPara_flipped = [
-                    -1.0 * float(data.loc[index, 'Steering Angle']),
-                    float(data.loc[index, 'Throttle']) - float(data.loc[index, 'Break']),
-                    float(data.loc[index, 'Speed'])
-                ]
-                label = [
-                    float(data.loc[index, 'Next Steering Angle']),
-                    float(data.loc[index, 'Next Throttle'])
-                ]
-                label_flipped = [
-                    -1.0 * float(data.loc[index, 'Next Steering Angle']),
-                    float(data.loc[index, 'Next Throttle'])
-                ]
+                subPara = float(data.loc[index, 'Steering Angle'])
+                # subPara = [
+                #     float(data.loc[index, 'Steering Angle']),
+                #     float(data.loc[index, 'Throttle']) - float(data.loc[index, 'Break']),
+                #     float(data.loc[index, 'Speed'])
+                # ]
+                subPara_flipped = -subPara
+                # subPara_flipped = [
+                #     -1.0 * float(data.loc[index, 'Steering Angle']),
+                #     float(data.loc[index, 'Throttle']) - float(data.loc[index, 'Break']),
+                #     float(data.loc[index, 'Speed'])
+                # ]
+                # label = [
+                #     float(data.loc[index, 'Next Steering Angle']),
+                #     float(data.loc[index, 'Next Throttle'])
+                # ]
+                label = float(data.loc[index, 'Next Steering Angle'])
+                # label_flipped = [
+                #     -1.0 * float(data.loc[index, 'Next Steering Angle']),
+                #     float(data.loc[index, 'Next Throttle'])
+                # ]
+                label_flipped = -label
                 # choose image type
                 actionType = np.random.choice(4)
                 if actionType == 0: # normal
@@ -235,8 +238,8 @@ class DeepModel():
                 count += 1
                 if count >= batch_size:
                     images_copy = deepcopy(np.array(images, dtype="float32"))
-                    subParas_copy = deepcopy(np.array(subParas, dtype="float32").reshape(-1, 3))
-                    labels_copy = deepcopy(np.array(labels, dtype="float32").reshape(-1, 2))
+                    subParas_copy = deepcopy(np.array(subParas, dtype="float32").reshape(-1, 1))
+                    labels_copy = deepcopy(np.array(labels, dtype="float32").reshape(-1, 1))
                     assert images_copy.shape[0] == subParas_copy.shape[0] == labels_copy.shape[0]
                     images = []
                     subParas = []
