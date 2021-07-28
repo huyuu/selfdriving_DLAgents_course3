@@ -25,6 +25,8 @@ class DeepModel():
         self.traceDataDirPath = "C:\\Users\\uie27589\\OneDrive - Continental AG\\2021\\MiniProjectAI\\trace3"
         # load model
         self.modelPath = './continuousModel_rawImage.h5'
+        self.imageModelPath = './imageModel.h5'
+        self.didConvTrainingFinish = True if os.path.exists(self.imageModelPath) else False
         self.model = self.__loadModel()
         self.shouldCollectStraight = True
 
@@ -60,7 +62,10 @@ class DeepModel():
                 # validation_data=self.__loadOneTrainingDataSetForGenerator(batch_size=128),
                 # validation_steps=10,
             )
-            self.model.save(self.modelPath)
+            if self.didConvTrainingFinish:
+                self.model.save(self.modelPath)
+            else:
+                self.model.save(self.imageModelPath)
 
 
     # MARK: - Private Method
@@ -71,6 +76,8 @@ class DeepModel():
         # if os.path.exists('continuousModel_succeed.h5'):
         #     return kr.models.load_model('continuousModel_succeed.h5')
         else:
+            subParas_amount = 3 if self.didConvTrainingFinish else 1
+
             image_inputs = kr.layers.Input(shape=(160, 320, 3), dtype=np.float, name='image')
             image_layer = kr.layers.Conv2D(filters=128, kernel_size=4, strides=(2, 2), activation='relu', name='image_conv1')(image_inputs)
             image_layer = kr.layers.MaxPooling2D(pool_size=(4,4))(image_layer)
@@ -86,29 +93,28 @@ class DeepModel():
             image_layer = kr.layers.Dense(1, activation='tanh', name='image_dense3')(image_layer)
 
             # subPara_inputs = layers.Input(shape=env.observation_spec['subPara']['shape'], dtype=np.float, name='subPara')
-            subPara_inputs = kr.layers.Input(shape=(1,), dtype=np.float, name='subPara')
+            subPara_inputs = kr.layers.Input(shape=(subParas_amount,), dtype=np.float, name='subPara')
             # subPara_dense = kr.layers.Dense(8, activation='tanh', name='subPara_dense')(subPara_inputs)
 
             common = kr.layers.concatenate([image_layer, subPara_inputs])
 
             num_actions = 2
-            # common = kr.layers.Dense(32, name='common_dense1')(common)
+            common = kr.layers.Dense(32, activation='tanh', name='common_dense1')(common)
             # num_actions = env.action_spec['shape'][0]
             # action = kr.layers.Dense(num_actions, name='action_dense1')(common)
             common = kr.layers.Dense(num_actions, activation='tanh', name='common_output')(common)
 
             model = kr.Model(inputs=[image_inputs, subPara_inputs], outputs=common)
-            # model = kr.Model(inputs=image_inputs, outputs=common)
+            if self.didConvTrainingFinish:
+                imageModel = kr.models.load_model("imageModel.h5")
+                for layerIndex in [1, 2, 3, 4, 5, 6, 7, 8, 9]:
+                    model.layers[layerIndex].set_weights(imageModel.layers[layerIndex].get_weights())
+                print("weights copied.")
             model.compile(
                 optimizer=kr.optimizers.Adam(learning_rate=1e-3),
                 loss='mse',
                 metrics=['mse']
             )
-            # model.compile(
-            #     optimizer=kr.optimizers.Adam(learning_rate=5e-3),
-            #     loss=kr.losses.CategoricalCrossentropy(),
-            #     metrics=[kr.metrics.CategoricalAccuracy()],
-            # )
             return model
 
 
@@ -131,8 +137,9 @@ class DeepModel():
             ])
             # create label
             for index in logData.index[:-2]:
-                logData.loc[index, 'Next Steering Angle'] = (logData.loc[index+1, 'Steering Angle'] + logData.loc[index+2, 'Steering Angle'])/2
-                logData.loc[index, 'Next Throttle'] = (logData.loc[index+1, 'Throttle'] - logData.loc[index+1, 'Break'] + logData.loc[index+2, 'Throttle'] - logData.loc[index+2, 'Break'])/2
+                logData.loc[index, 'Next Steering Angle'] = (float(logData.loc[index+1, 'Steering Angle']) + float(logData.loc[index+2, 'Steering Angle']))/2
+                # logData.loc[index, 'Next Throttle'] = (logData.loc[index+1, 'Throttle'] - logData.loc[index+1, 'Break'] + logData.loc[index+2, 'Throttle'] - logData.loc[index+2, 'Break'])/2
+                logData.loc[index, 'Next Throttle'] = float(logData.loc[index+1, 'Throttle']) - float(logData.loc[index+1, 'Break'])
                 # print(logData.groupby('Next Steering Angle').count())
             logData = logData.dropna()
             logData.to_csv(f"{self.traceDataDirPath}/{dataSetDirName}/new_log.csv")
@@ -185,28 +192,36 @@ class DeepModel():
                 #         self.shouldCollectStraight = True
                 # get observations
                 image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-                subPara = float(data.loc[index, 'Steering Angle'])
-                # subPara = [
-                #     float(data.loc[index, 'Steering Angle']),
-                #     float(data.loc[index, 'Throttle']) - float(data.loc[index, 'Break']),
-                #     float(data.loc[index, 'Speed'])
-                # ]
-                subPara_flipped = -subPara
-                # subPara_flipped = [
-                #     -1.0 * float(data.loc[index, 'Steering Angle']),
-                #     float(data.loc[index, 'Throttle']) - float(data.loc[index, 'Break']),
-                #     float(data.loc[index, 'Speed'])
-                # ]
-                # label = [
-                #     float(data.loc[index, 'Next Steering Angle']),
-                #     float(data.loc[index, 'Next Throttle'])
-                # ]
-                label = float(data.loc[index, 'Next Steering Angle'])
-                # label_flipped = [
-                #     -1.0 * float(data.loc[index, 'Next Steering Angle']),
-                #     float(data.loc[index, 'Next Throttle'])
-                # ]
-                label_flipped = -label
+
+                subPara = None
+                subPara_flipped = None
+                label = None
+                label_flipped = None
+                if self.didConvTrainingFinish:
+                    subPara = [
+                        float(data.loc[index, 'Steering Angle']),
+                        float(data.loc[index, 'Throttle']) - float(data.loc[index, 'Break']),
+                        float(data.loc[index, 'Speed']) * 2 - 1.0
+                    ]
+                    subPara_flipped = [
+                        -1.0 * float(data.loc[index, 'Steering Angle']),
+                        float(data.loc[index, 'Throttle']) - float(data.loc[index, 'Break']),
+                        float(data.loc[index, 'Speed']) * 2 - 1.0
+                    ]
+                    label = [
+                        float(data.loc[index, 'Next Steering Angle']),
+                        float(data.loc[index, 'Next Throttle'])
+                    ]
+                    label_flipped = [
+                        -1.0 * float(data.loc[index, 'Next Steering Angle']),
+                        float(data.loc[index, 'Next Throttle'])
+                    ]
+                else:
+                    subPara = float(data.loc[index, 'Steering Angle'])
+                    subPara_flipped = -subPara
+                    label = float(data.loc[index, 'Next Steering Angle'])
+                    label_flipped = -label
+
                 # choose image type
                 actionType = np.random.choice(4)
                 if actionType == 0: # normal
@@ -238,8 +253,8 @@ class DeepModel():
                 count += 1
                 if count >= batch_size:
                     images_copy = deepcopy(np.array(images, dtype="float32"))
-                    subParas_copy = deepcopy(np.array(subParas, dtype="float32").reshape(-1, 1))
-                    labels_copy = deepcopy(np.array(labels, dtype="float32").reshape(-1, 1))
+                    subParas_copy = deepcopy(np.array(subParas, dtype="float32"))
+                    labels_copy = deepcopy(np.array(labels, dtype="float32"))
                     assert images_copy.shape[0] == subParas_copy.shape[0] == labels_copy.shape[0]
                     images = []
                     subParas = []
