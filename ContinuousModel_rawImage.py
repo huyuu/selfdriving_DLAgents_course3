@@ -94,15 +94,16 @@ class DeepModel():
 
             # subPara_inputs = layers.Input(shape=env.observation_spec['subPara']['shape'], dtype=np.float, name='subPara')
             subPara_inputs = kr.layers.Input(shape=(subParas_amount,), dtype=np.float, name='subPara')
-            # subPara_dense = kr.layers.Dense(8, activation='tanh', name='subPara_dense')(subPara_inputs)
+            subPara_inputs = kr.layers.Input(shape=(subParas_amount,), dtype=np.float, name='subPara')
+            # subPara_dense = kr.layers.Dense(32, activation='relu', name='subPara_dense')(subPara_inputs)
 
             common = kr.layers.concatenate([image_layer, subPara_inputs])
 
             num_actions = 2
-            common = kr.layers.Dense(32, activation='tanh', name='common_dense1')(common)
+            # common = kr.layers.Dense(32, name='common_dense1')(common)
             # num_actions = env.action_spec['shape'][0]
             # action = kr.layers.Dense(num_actions, name='action_dense1')(common)
-            common = kr.layers.Dense(num_actions, activation='tanh', name='common_output')(common)
+            common = kr.layers.Dense(num_actions, name='common_output')(common)
 
             model = kr.Model(inputs=[image_inputs, subPara_inputs], outputs=common)
             if self.didConvTrainingFinish:
@@ -201,12 +202,12 @@ class DeepModel():
                     subPara = [
                         float(data.loc[index, 'Steering Angle']),
                         float(data.loc[index, 'Throttle']) - float(data.loc[index, 'Break']),
-                        float(data.loc[index, 'Speed']) * 2 - 1.0
+                        float(data.loc[index, 'Speed']) / 35.0
                     ]
                     subPara_flipped = [
                         -1.0 * float(data.loc[index, 'Steering Angle']),
                         float(data.loc[index, 'Throttle']) - float(data.loc[index, 'Break']),
-                        float(data.loc[index, 'Speed']) * 2 - 1.0
+                        float(data.loc[index, 'Speed']) / 35.0
                     ]
                     label = [
                         float(data.loc[index, 'Next Steering Angle']),
