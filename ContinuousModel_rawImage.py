@@ -79,28 +79,28 @@ class DeepModel():
             subParas_amount = 3 if self.didConvTrainingFinish else 1
 
             image_inputs = kr.layers.Input(shape=(160, 320, 3), dtype=np.float, name='image')
-            image_layer = kr.layers.Conv2D(filters=128, kernel_size=4, strides=(2, 2), activation='relu', name='image_conv1')(image_inputs)
-            image_layer = kr.layers.MaxPooling2D(pool_size=(4,4))(image_layer)
-            image_layer = kr.layers.Conv2D(filters=128, kernel_size=3, strides=(1, 1), activation='relu', name='image_conv2')(image_layer)
-            image_layer = kr.layers.MaxPooling2D(pool_size=(4,4))(image_layer)
-            image_layer = kr.layers.Conv2D(filters=128, kernel_size=3, strides=(1, 1), activation='relu', name='image_conv3')(image_layer)
-            image_layer = kr.layers.MaxPooling2D(pool_size=(2,2))(image_layer)
+            image_layer = kr.layers.Conv2D(filters=128, kernel_size=4, strides=(2, 2), activation='relu', name='image_conv1', trainable=False)(image_inputs)
+            image_layer = kr.layers.MaxPooling2D(pool_size=(4,4), name='maxpool_1', trainable=False)(image_layer)
+            image_layer = kr.layers.Conv2D(filters=128, kernel_size=3, strides=(1, 1), activation='relu', name='image_conv2', trainable=False)(image_layer)
+            image_layer = kr.layers.MaxPooling2D(pool_size=(4,4), name='maxpool_2', trainable=False)(image_layer)
+            image_layer = kr.layers.Conv2D(filters=128, kernel_size=3, strides=(1, 1), activation='relu', name='image_conv3', trainable=False)(image_layer)
+            image_layer = kr.layers.MaxPooling2D(pool_size=(2,2), name='maxpool_3', trainable=False)(image_layer)
             # image_layer = kr.layers.Conv2D(filters=128, kernel_size=2, strides=(1, 1), activation='relu', name='image_conv4')(image_layer)
             # image_layer = kr.layers.MaxPooling2D(pool_size=(2,2))(image_layer)
-            image_layer = kr.layers.Flatten(name='flattened')(image_layer)
+            image_layer = kr.layers.Flatten(name='flattened', trainable=False)(image_layer)
             # image_layer = kr.layers.Dense(256, activation='relu', name='image_dense1')(image_layer)
-            image_layer = kr.layers.Dense(256, activation='relu', name='image_dense2')(image_layer)
-            image_layer = kr.layers.Dense(1, activation='tanh', name='image_dense3')(image_layer)
+            image_layer = kr.layers.Dense(256, activation='relu', name='image_dense2', trainable=False)(image_layer)
+            image_layer = kr.layers.Dense(1, activation='tanh', name='image_dense3', trainable=False)(image_layer)
 
             # subPara_inputs = layers.Input(shape=env.observation_spec['subPara']['shape'], dtype=np.float, name='subPara')
-            subPara_inputs = kr.layers.Input(shape=(subParas_amount,), dtype=np.float, name='subPara')
+            # subPara_inputs = kr.layers.Input(shape=(subParas_amount,), dtype=np.float, name='subPara')
             subPara_inputs = kr.layers.Input(shape=(subParas_amount,), dtype=np.float, name='subPara')
             # subPara_dense = kr.layers.Dense(32, activation='relu', name='subPara_dense')(subPara_inputs)
 
             common = kr.layers.concatenate([image_layer, subPara_inputs])
 
             num_actions = 2
-            # common = kr.layers.Dense(32, name='common_dense1')(common)
+            common = kr.layers.Dense(32, name='common_dense1')(common)
             # num_actions = env.action_spec['shape'][0]
             # action = kr.layers.Dense(num_actions, name='action_dense1')(common)
             common = kr.layers.Dense(num_actions, name='common_output')(common)

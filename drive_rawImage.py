@@ -63,6 +63,10 @@ def telemetry(sid, data):
 
     # steering_angle_before = model.predict(image, batch_size=None)[0, 0]
     steering_angle_before, throttle_before = model.predict([image, subPara], batch_size=None)[0, :]
+    throttle_before = np.clip(throttle_before, -1.0, 1.0)
+    steering_angle_before = np.clip(steering_angle_before, -1.0, 1.0)
+    if speed >= 0.5:
+        throttle_before = -0.1
     # throttle_before = 0.2
     # steering_angle_before = max(-0.5, min(0.5, steering_angle_before))
     # throttle_before = 1.0# if speed <= 0.9 else 0.0
