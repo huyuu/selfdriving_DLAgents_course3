@@ -21,7 +21,7 @@ def train_test_split(images, subParas, labels, trainRatio=0.99):
 class DeepModel():
     def __init__(self):
         # self.traceDataDirPath = '../data/trace1'
-        # self.traceDataDirPath = '../trace2_data'
+        # self.traceDataDirPath = '../trace3_data'
         self.traceDataDirPath = "C:\\Users\\uie27589\\OneDrive - Continental AG\\2021\\MiniProjectAI\\trace3"
         # load model
         self.modelPath = './continuousModel_rawImage.h5'
@@ -137,8 +137,9 @@ class DeepModel():
                 'Speed'
             ])
             # create label
-            for index in logData.index[:-2]:
-                logData.loc[index, 'Next Steering Angle'] = (float(logData.loc[index+1, 'Steering Angle']) + float(logData.loc[index+2, 'Steering Angle']))/2
+            for index in logData.index[:-1]:
+                # logData.loc[index, 'Next Steering Angle'] = (float(logData.loc[index+1, 'Steering Angle']) + float(logData.loc[index+2, 'Steering Angle']))/2
+                logData.loc[index, 'Next Steering Angle'] = float(logData.loc[index+1, 'Steering Angle'])
                 # logData.loc[index, 'Next Throttle'] = (logData.loc[index+1, 'Throttle'] - logData.loc[index+1, 'Break'] + logData.loc[index+2, 'Throttle'] - logData.loc[index+2, 'Break'])/2
                 logData.loc[index, 'Next Throttle'] = float(logData.loc[index+1, 'Throttle']) - float(logData.loc[index+1, 'Break'])
                 # print(logData.groupby('Next Steering Angle').count())
